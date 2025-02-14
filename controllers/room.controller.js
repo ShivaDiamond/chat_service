@@ -1,0 +1,275 @@
+const Room = require( '../models/room' );
+const Message = require( '../models/message' );
+const redisClient = require( '../config/redis' );
+const apiResponse = require( '../utils/helpers/api.response' );
+const DmdService = require( '../utils/dmd_service/dmd.service' );
+
+exports.index = async ( req, res ) =>
+{
+    try
+    {
+        let { page = 1, perPage = 10 } = req.query;
+
+        page = Math.max( parseInt( page ), 1 );
+        perPage = Math.max( parseInt( perPage ), 1 );
+        const skip = ( page - 1 ) * perPage;
+
+        const rooms = await Room.find()
+            .skip( skip )
+            .limit( perPage );
+
+        const totalItems = await Room.countDocuments();
+
+        const totalPages = Math.ceil( totalItems / perPage );
+
+        apiResponse( res, 'success', 'Room has indexed successfully.', {
+            items: rooms,
+            page: page,
+            perPage: perPage,
+            totalPages: totalPages,
+            totalItems: totalItems,
+        } );
+    }
+    catch ( error )
+    {
+        apiResponse( res, 'failed', 'Bad request.', error.toString(), 400 );
+    }
+};
+
+exports.store = async ( req, res ) =>
+{
+    try
+    {
+        const room = await Room.create( {
+            title: req.body.title,
+            desc: req.body.desc,
+            admin: req.user.id,
+            members: [ req.user.id, ...req.body.members ]
+        } );
+
+        apiResponse( res, 'success', 'Room has created successfully.', room );
+    }
+    catch ( error )
+    {
+        apiResponse( res, 'failed', 'Bad request.', error.toString(), 400 );
+    }
+};
+
+exports.show = async ( req, res ) =>
+{
+    try
+    {
+        const room = await Room.findById( req.params.id );
+        if ( !room )
+        {
+            throw new Error( 'Room not found.' );
+        }
+
+        apiResponse( res, 'success', 'Room has shown successfully.', room );
+    }
+    catch ( error )
+    {
+        apiResponse( res, 'failed', 'Bad request.', error.toString(), 400 );
+    }
+}
+
+exports.update = async ( req, res ) =>
+{
+    try
+    {
+        const data = Room.updatableFields( req.body ); // Automatically filters fields
+
+        const room = await Room.findByIdAndUpdate( req.params.id, data, {
+            new: true,
+            runValidators: true
+        } );
+
+        if ( !room )
+        {
+            throw new Error( 'Room not found.' );
+        }
+
+        apiResponse( res, 'success', 'Room has updated successfully.', room );
+    }
+    catch ( error ) {
+        apiResponse( res, 'failed', 'Bad request.', error.toString(), 400 );
+    }
+}
+
+exports.delete = async ( req, res ) =>
+{
+    try
+    {
+        const room = await Room.findByIdAndDelete( req.params.id );
+        if ( !room )
+        {
+            throw new Error( 'Room not found.' );
+        }
+
+        apiResponse( res, 'success', 'Room has deleted successfully.', room );
+    }
+    catch ( error )
+    {
+        apiResponse( res, 'failed', 'Bad request.', error.toString(), 400 );
+    }
+}
+
+exports.getMessages = async ( req, res ) =>
+{
+    try
+    {
+        const room_id = req.params.id;
+        const room = await Room.findById( room_id );
+        if ( !room )
+        {
+            throw new Error( 'Room not found.' );
+        }
+
+        let { page = 1, perPage = 10 } = req.query;
+
+        page = Math.max( parseInt( page ), 1 );
+        perPage = Math.max( parseInt( perPage ), 1 );
+        const skip = ( page - 1 ) * perPage;
+
+        const messages = await Message.find( { room_id: room_id } )
+            .sort( { createdAt: 1 } )
+            .skip( skip )
+            .limit( perPage );
+
+        apiResponse( res, 'success', 'Room messages has indexed successfully.', messages );
+    }
+    catch ( error )
+    {
+        apiResponse( res, 'failed', 'Bad request.', error.toString(), 400 );
+    }
+}
+
+exports.getMembers = async ( req, res ) =>
+{
+    try
+    {
+        const room_id = req.params.id;
+        const room = await Room.findById( room_id );
+        if ( !room )
+        {
+            throw new Error( 'Room not found.' );
+        }
+
+        // Fetch cached profiles first
+        let membersData = [];
+        let missingProfiles = [];
+
+        for ( const memberId of room.members )
+        {
+            let cachedProfile = await redisClient.get( `profile:${memberId}` );
+            if ( cachedProfile )
+            {
+                membersData.push( JSON.parse( cachedProfile ) );
+            }
+            else
+            {
+                missingProfiles.push( memberId );
+            }
+        }
+
+        // Fetch missing profiles in **one batch API call**
+        if ( missingProfiles.length > 0 )
+        {
+            const fetchedMissingProfiles = await DmdService.indexBatchProfiles( missingProfiles );
+            fetchedMissingProfiles.forEach( profile =>
+            {
+                redisClient.setex( `profile:${profile.id}`, 3600, JSON.stringify( profile ) ); // Cache for 1 hour
+                membersData.push( profile );
+            } );
+        }
+
+        apiResponse( res, 'success', 'Room members has indexed successfully.', { ...room.toObject(), members: membersData } );
+    }
+    catch ( error )
+    {
+        apiResponse( res, 'failed', 'Bad request.', error.toString(), 400 );
+    }
+}
+
+exports.addMembers = async ( req, res ) =>
+{
+    try {
+        const { memberIds } = req.body; // Accept an array of members
+        if ( !Array.isArray( memberIds ) || memberIds.length === 0 )
+        {
+            throw new Error( 'Invalid member list.' );
+        }
+
+        const room_id = req.params.id;
+        const room = await Room.findById( room_id );
+        if ( !room )
+        {
+            throw new Error( 'Room not found.' );
+        }
+
+        // Only admin or existing room members can add new members
+        if ( room.admin !== req.user.id && !room.members.includes( req.user.id ) )
+        {
+            throw new Error( 'Not authorized.' );
+        }
+
+        // Filter out existing members to avoid duplicates
+        const newMembers = memberIds.filter( memberId => !room.members.includes( memberId ) );
+
+        if ( newMembers.length > 0 )
+        {
+            room.members.push( ...newMembers );
+            await room.save();
+        }
+
+        apiResponse( res, 'success', 'Members added successfully.', newMembers );
+    }
+    catch ( error )
+    {
+        apiResponse( res, 'failed', 'Bad request.', error.toString(), 400 );
+    }
+};
+
+exports.removeMembers = async ( req, res ) =>
+{
+    try
+    {
+        const { memberIds } = req.body; // Accept an array of members
+        if ( !Array.isArray( memberIds ) || memberIds.length === 0 )
+        {
+            throw new Error( 'Invalid member list.' );
+        }
+
+        const room_id = req.params.id;
+        const room = await Room.findById( room_id );
+        if ( !room )
+        {
+            throw new Error( 'Room not found.' );
+        }
+
+        // Only the admin can remove members
+        if ( room.admin !== req.user.id )
+        {
+            throw new Error( 'Only admin can remove members.' );
+        }
+
+        // Filter out the members that need to be removed
+        const initialMemberCount = room.members.length;
+        room.members = room.members.filter( member => !memberIds.includes( member ) );
+
+        // Check if any members were actually removed
+        if ( room.members.length === initialMemberCount )
+        {
+            throw new Error( 'No members were removed. They might not be in the room.' );
+        }
+
+        await room.save();
+
+        apiResponse( res, 'success', 'Members removed successfully.', memberIds );
+
+    }
+    catch ( error )
+    {
+        apiResponse( res, 'failed', 'Bad request.', error.toString(), 400 );
+    }
+};
