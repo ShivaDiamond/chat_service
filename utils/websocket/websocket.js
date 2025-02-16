@@ -20,13 +20,13 @@ exports.initWebSocket = ( server ) =>
             console.log( `Client ${socket.id} joined room ${room_id}` );
         } );
 
-        socket.on( 'send_message', async ( { room_id, sender, content } ) =>
+        socket.on( 'send_message', async ( { room_id, sender_id, content } ) =>
         {
-            if ( !room_id || !sender || !content ) return;
+            if ( !room_id || !sender_id || !content ) return;
 
             try
             {
-                const message = await Message.create( { room_id, sender, content } );
+                const message = await Message.create( { room_id, sender_id, content } );
 
                 // Broadcast the new message to everyone in the room
                 io.to( room_id ).emit( 'new_message', message );

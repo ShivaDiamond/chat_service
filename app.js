@@ -17,7 +17,7 @@ const { host, port, mongo_uri } = require( './config' );
 
 // Create an Express app
 const app = express();
-const server = http.createServer(app);
+const server = http.createServer( app );
 
 // Init Web Socket
 initWebSocket( server );
