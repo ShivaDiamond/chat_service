@@ -51,7 +51,7 @@ exports.store = async ( req, res ) =>
         const room = await Room.create( {
             title: req.body.title,
             desc: req.body.desc,
-            admin: req.user.id,
+            admin_id: req.user.id,
             members: [ req.user.id, ...req.body.members ]
         } );
 
@@ -114,7 +114,7 @@ exports.delete = async ( req, res ) =>
             throw new Error( 'Room not found.' );
         }
 
-        if ( room.admin !== req.user.id )
+        if ( room.admin_id !== req.user.id )
         {
             throw new Error( 'Only admin can delete the room.' );
         }
@@ -272,7 +272,7 @@ exports.removeMembers = async ( req, res ) =>
         }
 
         // Only the admin can remove members
-        if ( room.admin !== req.user.id )
+        if ( room.admin_id !== req.user.id )
         {
             throw new Error( 'Only admin can remove members.' );
         }
