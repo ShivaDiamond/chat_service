@@ -1,5 +1,5 @@
 services:
-  chat_app:
+  app:
     build:
       context: .
       dockerfile: .sre/Dockerfile
