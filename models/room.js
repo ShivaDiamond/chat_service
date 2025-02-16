@@ -9,7 +9,7 @@ const RoomSchema = new mongoose.Schema( {
 
 RoomSchema.statics.updatableFields = function ( updates )
 {
-    const allowedUpdates = [ 'title', "desc" ];
+    const allowedUpdates = [ 'title', 'desc' ];
     return Object.keys( updates )
         .filter( key => allowedUpdates.includes( key ) )
         .reduce( ( obj, key ) => ( { ...obj, [ key ]: updates[ key ] } ), {} );

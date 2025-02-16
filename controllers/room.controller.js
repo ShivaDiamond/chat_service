@@ -8,21 +8,30 @@ exports.index = async ( req, res ) =>
 {
     try
     {
-        let { page = 1, perPage = 10 } = req.query;
+        let { page = 1, perPage = 10, ...filters } = req.query;
 
         page = Math.max( parseInt( page ), 1 );
         perPage = Math.max( parseInt( perPage ), 1 );
         const skip = ( page - 1 ) * perPage;
 
-        const rooms = await Room.find()
+        // Construct filter object dynamically
+        let filter = {};
+        for ( const key in filters )
+        {
+            if ( filters[ key ] )
+            {
+                filter[ key ] = filters[ key ];
+            }
+        }
+
+        const rooms = await Room.find( filter )
             .skip( skip )
             .limit( perPage );
 
-        const totalItems = await Room.countDocuments();
-
+        const totalItems = await Room.countDocuments( filter );
         const totalPages = Math.ceil( totalItems / perPage );
 
-        apiResponse( res, 'success', 'Room has indexed successfully.', {
+        apiResponse( res, 'success', 'Room has been indexed successfully.', {
             items: rooms,
             page: page,
             perPage: perPage,
@@ -35,7 +44,6 @@ exports.index = async ( req, res ) =>
         apiResponse( res, 'failed', 'Bad request.', error.toString(), 400 );
     }
 };
-
 exports.store = async ( req, res ) =>
 {
     try
@@ -100,11 +108,18 @@ exports.delete = async ( req, res ) =>
 {
     try
     {
-        const room = await Room.findByIdAndDelete( req.params.id );
+        const room = await Room.findById( req.params.id );
         if ( !room )
         {
             throw new Error( 'Room not found.' );
         }
+
+        if ( room.admin !== req.user.id )
+        {
+            throw new Error( 'Only admin can delete the room.' );
+        }
+
+        await Room.findByIdAndDelete( req.params.id );
 
         apiResponse( res, 'success', 'Room has deleted successfully.', room );
     }
@@ -125,13 +140,18 @@ exports.getMessages = async ( req, res ) =>
             throw new Error( 'Room not found.' );
         }
 
+        if ( !room.members || !room.members.includes( req.user.id ) )
+        {
+            throw new Error( 'You are not a member of the room.' );
+        }
+
         let { page = 1, perPage = 10 } = req.query;
 
         page = Math.max( parseInt( page ), 1 );
         perPage = Math.max( parseInt( perPage ), 1 );
         const skip = ( page - 1 ) * perPage;
 
-        const messages = await Message.find( { room_id: room_id } )
+        const messages = await Message.find( { room_id: room._id } )
             .sort( { createdAt: 1 } )
             .skip( skip )
             .limit( perPage );
@@ -155,6 +175,11 @@ exports.getMembers = async ( req, res ) =>
             throw new Error( 'Room not found.' );
         }
 
+        if ( !room.members || !room.members.includes( req.user.id ) )
+        {
+            throw new Error( 'You are not a member of the room.' );
+        }
+
         // Fetch cached profiles first
         let membersData = [];
         let missingProfiles = [];
@@ -172,10 +197,10 @@ exports.getMembers = async ( req, res ) =>
             }
         }
 
-        // Fetch missing profiles in **one batch API call**
+        // Fetch missing profiles in one batch API call
         if ( missingProfiles.length > 0 )
         {
-            const fetchedMissingProfiles = await DmdService.indexBatchProfiles( missingProfiles );
+            const fetchedMissingProfiles = await DmdService.indexBatchProfiles( req.token, missingProfiles );
             fetchedMissingProfiles.forEach( profile =>
             {
                 redisClient.setex( `profile:${profile.id}`, 3600, JSON.stringify( profile ) ); // Cache for 1 hour
@@ -194,8 +219,8 @@ exports.getMembers = async ( req, res ) =>
 exports.addMembers = async ( req, res ) =>
 {
     try {
-        const { memberIds } = req.body; // Accept an array of members
-        if ( !Array.isArray( memberIds ) || memberIds.length === 0 )
+        const { member_ids } = req.body; // Accept an array of members
+        if ( !Array.isArray( member_ids ) || member_ids.length === 0 )
         {
             throw new Error( 'Invalid member list.' );
         }
@@ -207,14 +232,13 @@ exports.addMembers = async ( req, res ) =>
             throw new Error( 'Room not found.' );
         }
 
-        // Only admin or existing room members can add new members
-        if ( room.admin !== req.user.id && !room.members.includes( req.user.id ) )
+        if ( !room.members || !room.members.includes( req.user.id ) )
         {
-            throw new Error( 'Not authorized.' );
+            throw new Error( 'You are not a member of the room.' );
         }
 
         // Filter out existing members to avoid duplicates
-        const newMembers = memberIds.filter( memberId => !room.members.includes( memberId ) );
+        const newMembers = member_ids.filter( memberId => !room.members.includes( memberId ) );
 
         if ( newMembers.length > 0 )
         {
@@ -234,8 +258,8 @@ exports.removeMembers = async ( req, res ) =>
 {
     try
     {
-        const { memberIds } = req.body; // Accept an array of members
-        if ( !Array.isArray( memberIds ) || memberIds.length === 0 )
+        const { member_ids } = req.body; // Accept an array of members
+        if ( !Array.isArray( member_ids ) || member_ids.length === 0 )
         {
             throw new Error( 'Invalid member list.' );
         }
@@ -255,7 +279,7 @@ exports.removeMembers = async ( req, res ) =>
 
         // Filter out the members that need to be removed
         const initialMemberCount = room.members.length;
-        room.members = room.members.filter( member => !memberIds.includes( member ) );
+        room.members = room.members.filter( member => !member_ids.includes( member ) );
 
         // Check if any members were actually removed
         if ( room.members.length === initialMemberCount )
@@ -265,7 +289,7 @@ exports.removeMembers = async ( req, res ) =>
 
         await room.save();
 
-        apiResponse( res, 'success', 'Members removed successfully.', memberIds );
+        apiResponse( res, 'success', 'Members removed successfully.', member_ids );
 
     }
     catch ( error )
