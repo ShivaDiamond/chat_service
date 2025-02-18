@@ -8,36 +8,17 @@ exports.index = async ( req, res ) =>
 {
     try
     {
-        let { page = 1, perPage = 10, ...filters } = req.query;
+        let { page = 1, perPage = 10 } = req.query;
 
         page = Math.max( parseInt( page ), 1 );
-        perPage = Math.max( parseInt( perPage ), 1 );
+        perPage = Math.max( parseInt( perPage ), 20 );
         const skip = ( page - 1 ) * perPage;
 
-        // Construct filter object dynamically
-        let filter = {};
-        for ( const key in filters )
-        {
-            if ( filters[ key ] )
-            {
-                filter[ key ] = filters[ key ];
-            }
-        }
-
-        const rooms = await Room.find( filter )
+        const rooms = await Room.find( { members: { $in: [ req.user.id ] } } )
             .skip( skip )
             .limit( perPage );
 
-        const totalItems = await Room.countDocuments( filter );
-        const totalPages = Math.ceil( totalItems / perPage );
-
-        apiResponse( res, 'success', 'Room has been indexed successfully.', {
-            items: rooms,
-            page: page,
-            perPage: perPage,
-            totalPages: totalPages,
-            totalItems: totalItems,
-        } );
+        apiResponse( res, 'success', 'Room has been indexed successfully.', rooms );
     }
     catch ( error )
     {
