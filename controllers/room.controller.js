@@ -8,15 +8,15 @@ exports.index = async ( req, res ) =>
 {
     try
     {
-        let { page = 1, perPage = 10 } = req.query;
+        let { page = 1, per_page = 10 } = req.query;
 
         page = Math.max( parseInt( page ), 1 );
-        perPage = Math.max( parseInt( perPage ), 20 );
-        const skip = ( page - 1 ) * perPage;
+        per_page = Math.max( parseInt( per_page ), 20 );
+        const skip = ( page - 1 ) * per_page;
 
         const rooms = await Room.find( { members: { $in: [ req.user.id ] } } )
             .skip( skip )
-            .limit( perPage );
+            .limit( per_page );
 
         apiResponse( res, 'success', 'Room has been indexed successfully.', rooms );
     }
@@ -126,16 +126,16 @@ exports.getMessages = async ( req, res ) =>
             throw new Error( 'You are not a member of the room.' );
         }
 
-        let { page = 1, perPage = 10 } = req.query;
+        let { page = 1, per_page = 10 } = req.query;
 
         page = Math.max( parseInt( page ), 1 );
-        perPage = Math.max( parseInt( perPage ), 1 );
-        const skip = ( page - 1 ) * perPage;
+        per_page = Math.max( parseInt( per_page ), 1 );
+        const skip = ( page - 1 ) * per_page;
 
         const messages = await Message.find( { room_id: room._id } )
             .sort( { createdAt: 1 } )
             .skip( skip )
-            .limit( perPage );
+            .limit( per_page );
 
         apiResponse( res, 'success', 'Room messages has indexed successfully.', messages );
     }
