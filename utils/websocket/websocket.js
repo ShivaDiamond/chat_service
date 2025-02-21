@@ -5,7 +5,12 @@ let io;
 
 exports.initWebSocket = ( server ) =>
 {
-    io = new Server( server, { cors: { origin: '*' } } );
+    io = new Server( server, {
+        cors: { origin: '*' },
+        pingInterval: 25000, // Ping clients every 25 seconds
+        pingTimeout: 60000, // Wait for 60 seconds before considering a client disconnected
+        transports: [ 'websocket', 'polling' ] // Ensure fallback for polling
+    } );
 
     io.on( 'connection', ( socket ) =>
     {
