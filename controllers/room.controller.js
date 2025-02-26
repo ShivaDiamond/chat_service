@@ -25,15 +25,18 @@ exports.index = async ( req, res ) =>
         apiResponse( res, 'failed', 'Bad request.', error.toString(), 400 );
     }
 };
+
 exports.store = async ( req, res ) =>
 {
     try
     {
+        const uniqueMembers = [ ...new Set( [ req.user.id, ...req.body.members ] ) ];
+
         const room = await Room.create( {
             title: req.body.title,
             desc: req.body.desc,
             admin_id: req.user.id,
-            members: [ req.user.id, ...req.body.members ]
+            members: uniqueMembers
         } );
 
         apiResponse( res, 'success', 'Room has created successfully.', room );
@@ -256,6 +259,12 @@ exports.removeMembers = async ( req, res ) =>
         if ( room.admin_id !== req.user.id )
         {
             throw new Error( 'Only admin can remove members.' );
+        }
+
+        // Prevent admin from removing themselves
+        if ( member_ids.includes( room.admin_id ) )
+        {
+            throw new Error( 'Admin cannot remove themselves from the room.' );
         }
 
         // Filter out the members that need to be removed
