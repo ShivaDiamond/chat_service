@@ -1,13 +1,15 @@
 services:
-  app:
+  chat_app:
     build:
       context: .
       dockerfile: .sre/Dockerfile
+    container_name: chat_app
     ports:
       - "3001:3001"
     restart: unless-stopped
+    networks:
+      - local_network
 
 networks:
-  default:
-    external:
-      name: local_network
+  local_network:
+    external: true
