@@ -3,6 +3,7 @@ const mongoose = require( 'mongoose' );
 const RoomSchema = new mongoose.Schema( {
     title: { type: String, required: true },
     desc: { type: String, required: false },
+    product_id: { type: String, required: false },
     admin_id: { type: String, required: true },
     members: [ { type: String, required: true } ]
 }, { timestamps: true } );

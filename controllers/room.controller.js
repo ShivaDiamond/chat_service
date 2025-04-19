@@ -35,11 +35,37 @@ exports.store = async ( req, res ) =>
         const room = await Room.create( {
             title: req.body.title,
             desc: req.body.desc,
+            product_id: req.body.product_id,
             admin_id: req.user.id,
             members: uniqueMembers
         } );
 
         apiResponse( res, 'success', 'Room has created successfully.', room );
+    }
+    catch ( error )
+    {
+        apiResponse( res, 'failed', 'Bad request.', error.toString(), 400 );
+    }
+};
+
+exports.getProductRooms = async ( req, res ) =>
+{
+    try
+    {
+        let { page = 1, per_page = 10 } = req.query;
+
+        page = Math.max( parseInt( page ), 1 );
+        per_page = Math.max( parseInt( per_page ), 20 );
+        const skip = ( page - 1 ) * per_page;
+
+        const rooms = await Room.find( {
+            members: { $in: [ req.user.id ] },
+            product_id: req.params.product_id
+        } )
+        .skip( skip )
+        .limit( per_page );
+
+        apiResponse( res, 'success', 'Product rooms has been indexed successfully.', rooms );
     }
     catch ( error )
     {

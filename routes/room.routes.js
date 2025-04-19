@@ -9,6 +9,7 @@ router.use( authMiddleware );
 
 router.get( '/', RoomsController.index );
 router.post( '/', RoomsController.store );
+router.get( '/products/:product_id', RoomsController.getProductRooms );
 router.get( '/:id', RoomsController.show );
 router.put( '/:id', RoomsController.update );
 router.delete( '/:id', RoomsController.delete );
