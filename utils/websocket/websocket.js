@@ -27,7 +27,7 @@ exports.initWebSocket = ( server ) =>
 
         socket.on( 'send_message', async ( { room_id, sender_id, content, attachments } ) =>
         {
-            if ( !room_id || !sender_id || !content ) return;
+            if ( !room_id || !sender_id || ( !content && ( !Array.isArray( attachments ) || attachments.length === 0 ) ) ) return;
 
             try {
                 const messageData = { room_id, sender_id, content };
