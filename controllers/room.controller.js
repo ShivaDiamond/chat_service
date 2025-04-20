@@ -15,6 +15,7 @@ exports.index = async ( req, res ) =>
         const skip = ( page - 1 ) * per_page;
 
         const rooms = await Room.find( { members: { $in: [ req.user.id ] } } )
+            .sort( { createdAt: -1 } )
             .skip( skip )
             .limit( per_page );
 
@@ -63,6 +64,7 @@ exports.getProductRooms = async ( req, res ) =>
             members: { $in: [ req.user.id ] },
             product_id: req.params.product_id
         } )
+        .sort( { createdAt: -1 } )
         .skip( skip )
         .limit( per_page );
 
