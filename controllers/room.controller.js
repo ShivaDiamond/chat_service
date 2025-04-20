@@ -37,6 +37,7 @@ exports.store = async ( req, res ) =>
             desc: req.body.desc,
             product_id: req.body.product_id,
             admin_id: req.user.id,
+            avatar: req.body.avatar,
             members: uniqueMembers
         } );
 
