@@ -163,7 +163,7 @@ exports.getMessages = async ( req, res ) =>
         const skip = ( page - 1 ) * per_page;
 
         const messages = await Message.find( { room_id: room._id } )
-            .sort( { createdAt: 1 } )
+            .sort( { createdAt: -1 } )
             .skip( skip )
             .limit( per_page );
 
