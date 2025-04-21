@@ -77,7 +77,7 @@ exports.update = async ( req, res ) => {
 
         // Notify users via WebSocket
         const io = websocket.getIO();
-        io.to( message.room_id ).emit( 'edit_message', updatedMessage );
+        io.to( message.room_id.toString() ).emit( 'edit_message', updatedMessage );
 
         apiResponse( res, 'success', 'Message has updated successfully.', updatedMessage );
     }
@@ -104,7 +104,7 @@ exports.delete = async ( req, res ) => {
 
         // Notify users via WebSocket
         const io = websocket.getIO();
-        io.to( message.room_id ).emit( 'delete_message', deletedMessage.id );
+        io.to( message.room_id.toString() ).emit( 'delete_message', deletedMessage.id );
 
         apiResponse( res, 'success', 'Message has deleted successfully.', deletedMessage );
     }
