@@ -4,26 +4,67 @@ const redisClient = require( '../config/redis' );
 const apiResponse = require( '../utils/helpers/api.response' );
 const DmdService = require( '../utils/dmd_service/dmd.service' );
 
-exports.index = async ( req, res ) =>
-{
-    try
-    {
-        let { page = 1, per_page = 10 } = req.query;
+exports.index = async ( req, res ) => {
+    try {
+        let { page = 1, per_page = 10, profile_id } = req.query;
 
-        page = Math.max( parseInt( page ), 1 );
+        page = Math.max( parseInt( page ), 1);
         per_page = Math.max( parseInt( per_page ), 20 );
         const skip = ( page - 1 ) * per_page;
 
-        const rooms = await Room.find( { members: { $in: [ req.user.id ] } } )
+        // Base members filter with the current user
+        let membersFilter = [ req.user.id ];
+
+        // If profile_id is provided, include it in the filter
+        if ( profile_id ) {
+            membersFilter.push( profile_id );
+        }
+
+        // Use $all to ensure both ids are present if profile_id is provided
+        const query = profile_id
+            ? { members: { $all: membersFilter } }
+            : { members: { $in: [ req.user.id ] } };
+
+        const rooms = await Room.find( query )
             .sort( { createdAt: -1 } )
             .skip( skip )
             .limit( per_page );
 
         apiResponse( res, 'success', 'Room has been indexed successfully.', rooms );
-    }
-    catch ( error )
-    {
+    } catch ( error ) {
         apiResponse( res, 'failed', 'Bad request.', error.toString(), 400 );
+    }
+};
+
+exports.index = async (req, res) => {
+    try {
+        let { page = 1, per_page = 10, profile_id } = req.query;
+
+        page = Math.max(parseInt(page), 1);
+        per_page = Math.max(parseInt(per_page), 20);
+        const skip = (page - 1) * per_page;
+
+        // Base members filter with the current user
+        let membersFilter = [req.user.id];
+
+        // If profile_id is provided, include it in the filter
+        if (profile_id) {
+            membersFilter.push(profile_id);
+        }
+
+        // Use $all to ensure both ids are present if profile_id is provided
+        const query = profile_id
+            ? { members: { $all: membersFilter } }
+            : { members: { $in: [req.user.id] } };
+
+        const rooms = await Room.find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(per_page);
+
+        apiResponse(res, 'success', 'Room has been indexed successfully.', rooms);
+    } catch (error) {
+        apiResponse(res, 'failed', 'Bad request.', error.toString(), 400);
     }
 };
 
